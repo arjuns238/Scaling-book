@@ -1,5 +1,3 @@
-from collections import defaultdict
-from inference import generate
 import jax
 
 def _num_digits(n):
