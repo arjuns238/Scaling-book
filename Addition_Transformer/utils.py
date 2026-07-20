@@ -1,6 +1,7 @@
 from collections import defaultdict
 from inference import generate
-from data import *
+from data import stoi, itos, BOS, PAD, EOS
+import jax
 
 def _num_digits(n):
     return len(str(n))
