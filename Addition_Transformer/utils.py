@@ -78,3 +78,12 @@ def evaluate_accuracy(tokens, masks, weights, cfg, verbose=True, collect_wrongs 
         return overall, {k: correct[k] / total[k] for k in total}, wrongs
 
     return overall, {k: correct[k] / total[k] for k in total}
+
+def count_params(weights):
+    return sum(x.size for x in jax.tree_util.leaves(weights))
+
+def make_cfg(base, d_model, num_layers):
+    heads = max(1, d_model // 64)
+    return base.replace(d_model=d_model, num_layers=num_layers,
+                        query_heads=heads, kv_heads=heads)
+
