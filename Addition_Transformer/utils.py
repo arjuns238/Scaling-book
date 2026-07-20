@@ -15,7 +15,7 @@ def _count_carries(a, b):
     return carries
 
 def count_params(weights):
-    return sum(x.size for x in jax.tree_util.leaves(weights))
+    return sum(x.size for x in jax.tree_util.tree_leaves(weights))
 
 def make_cfg(base, d_model, num_layers):
     heads = max(1, d_model // 64)
