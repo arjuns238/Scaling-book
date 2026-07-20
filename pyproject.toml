@@ -1,0 +1,17 @@
+[project]
+name = "scaling-book"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "flax>=0.12.7",
+    "ipykernel>=7.3.0",
+    "jax>=0.11.0",
+    "jaxlib>=0.11.0",
+    "jupyter>=1.1.1",
+    "matplotlib>=3.11.1",
+    "numpy>=2.5.1",
+    "optax>=0.2.8",
+    "tqdm>=4.69.0",
+    "typing-extensions>=4.16.0",
+]
