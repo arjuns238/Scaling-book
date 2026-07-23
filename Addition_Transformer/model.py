@@ -45,7 +45,7 @@ class Weights:
         embed_rng = layer_rngs[0]
         pos_embed_rng = layer_rngs[1]
         return cls(
-            layers = [Layer.init(cfg, rng) for r in layer_rngs[2:]],
+            layers = [Layer.init(cfg, r) for r in layer_rngs[2:]],
             embedding = normal()(embed_rng, (cfg.vocab_size, cfg.d_model), dtype=cfg.dtype),
             pos_embed = normal()(pos_embed_rng, (cfg.max_seq_len, cfg.d_model), dtype=cfg.dtype),
             final_gamma = jnp.ones((cfg.d_model,), dtype=cfg.dtype)
