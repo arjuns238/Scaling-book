@@ -168,7 +168,7 @@ def moe(ffw_in: jax.Array, valid, cfg: Config, layer: Layer):
     return out_flat.reshape(B, T, D), aux_loss, stats
 
 
-def layer_forward(x: jax.Array, valid: jax.Array, cfg: Config, layer: Layer) -> jax.Array:
+def layer_forward(x: jax.Array, valid: jax.Array, cfg: Config, layer: Layer):
     # pre attn rms norm
     attn_in = rms_norm(x, layer.gamma1)
 
