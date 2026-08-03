@@ -23,6 +23,19 @@ embeddings, tied input/output embedding. The MoE variant replaces the dense FFW
 with top-k routed experts (`jax.lax.ragged_dot`, sorted dispatch, load-balance aux
 loss). Dense and MoE are the same code path, selected by `cfg.num_experts == 0`.
 
+**How much training this took.** The dense result rests on **68 training runs**:
+
+| | runs | optimizer steps | FLOPs |
+|---|--:|--:|--:|
+| 8×8 (N, D) grid, 1 seed | 64 | 109,120 | 1.64e15 |
+| multi-epoch infill (§6) | 4 | 37,708 | 3.80e14 |
+| **total** | **68** | **146,828** | **2.02e15** |
+
+An earlier dense sweep (~30 runs, a 5×6 grid on a coarser ladder) is not counted:
+its conclusions were void once the fitter bug in §4.1 was found, and only 27 of its
+`(N, D, val_loss)` rows survived — recovered by parsing the notebook's stored cell
+output, since rows were not being persisted at the time.
+
 **N is active parameters**, not total:
 
 ```
