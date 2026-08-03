@@ -216,7 +216,7 @@ def layer_forward(x: jax.Array, valid: jax.Array, cfg: Config, layer: Layer) -> 
     # residual connection
     return down_proj + attn_out, aux_loss, stats
 
-def forward(token_ids: jax.Array, weights: Weights, cfg: Config) -> jax.Array:
+def forward(token_ids: jax.Array, weights: Weights, cfg: Config):
     # valid mask - required for moe loss calculation - anything except the pad ids
     valid = jnp.not_equal(token_ids, stoi[PAD])
     # embed tokens - [B, T] -> [B, T, D]
