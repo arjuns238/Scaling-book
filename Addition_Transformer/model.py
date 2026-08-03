@@ -81,6 +81,33 @@ def router_aux(logits, expert_ids, valid, E, K):
     return E * jnp.sum(f * P)
 
 
+def router_stats(logits, expert_ids, valid, E, K):
+    '''
+    Diagnostics, not part of the loss. Two numbers per moe layer:
+
+      frac     (E,) fraction of dispatch slots each expert received. Balanced = 1/E.
+               max(frac) near 1 means collapse onto one expert.
+      entropy  scalar, mean entropy of the router distribution over valid tokens,
+               in nats. Balanced = log(E); near 0 means the router is saturated
+               (confident per token, which can still be balanced across the batch).
+
+    frac and entropy answer different questions: frac is batch-level balance,
+    entropy is per-token confidence. A router can be perfectly balanced and fully
+    saturated at once - that is a healthy specialized router, not a collapsed one.
+    '''
+    m = logits.shape[0]
+    vf = valid.reshape(m).astype(jnp.float32)
+    n = vf.sum()
+
+    probs = jax.nn.softmax(logits, -1)
+    ent = -(probs * jnp.log(probs + 1e-9)).sum(-1) # (m,) nats
+    entropy = (ent * vf).sum() / n
+
+    vk = jnp.repeat(vf, K)
+    frac = (jax.nn.one_hot(expert_ids, E, dtype=jnp.float32) * vk[:, None]).sum(0) / (n * K)
+    return dict(frac=frac, entropy=entropy)
+
+
 def moe(ffw_in: jax.Array, valid, cfg: Config, layer: Layer):
     '''
     rough moe algorithm:
@@ -137,7 +164,8 @@ def moe(ffw_in: jax.Array, valid, cfg: Config, layer: Layer):
 
     # return out flat reshape correctly and the aux loss.
     aux_loss = router_aux(logits, expert_ids, valid, E, K)
-    return out_flat.reshape(B, T, D), aux_loss
+    stats = router_stats(logits, expert_ids, valid, E, K)
+    return out_flat.reshape(B, T, D), aux_loss, stats
 
 
 def layer_forward(x: jax.Array, valid: jax.Array, cfg: Config, layer: Layer) -> jax.Array:
@@ -180,12 +208,13 @@ def layer_forward(x: jax.Array, valid: jax.Array, cfg: Config, layer: Layer) -> 
         ffw_out = up_proj2 * silu_out
         down_proj = jnp.einsum("btf,fd->btd", ffw_out, layer.wout)
         aux_loss = jnp.zeros((), dtype=jnp.float32) # no router to balance
+        stats = None                                # no router to diagnose
     else:
         # moe
-        down_proj, aux_loss = moe(ffw_in, valid, cfg, layer)
+        down_proj, aux_loss, stats = moe(ffw_in, valid, cfg, layer)
 
     # residual connection
-    return down_proj + attn_out, aux_loss
+    return down_proj + attn_out, aux_loss, stats
 
 def forward(token_ids: jax.Array, weights: Weights, cfg: Config) -> jax.Array:
     # valid mask - required for moe loss calculation - anything except the pad ids
@@ -194,10 +223,12 @@ def forward(token_ids: jax.Array, weights: Weights, cfg: Config) -> jax.Array:
     positions = jnp.arange(token_ids.shape[1], dtype=jnp.int32)
     x = weights.embedding[token_ids, :] + weights.pos_embed[positions] # [B, T, D] + [T, D] = [B, T, D]
     aux_losses = []
+    stats = [] # per-layer routing diagnostics; entries are None on the dense path
     for layer in weights.layers:
-        x, aux_loss = layer_forward(x, valid, cfg, layer)
+        x, aux_loss, layer_stats = layer_forward(x, valid, cfg, layer)
         aux_losses.append(aux_loss)
+        stats.append(layer_stats)
     # final rms norm
     x = rms_norm(x, weights.final_gamma)
     # final embedding
-    return jnp.einsum("btd,vd->btv", x, weights.embedding), jnp.stack(aux_losses).mean()
+    return jnp.einsum("btd,vd->btv", x, weights.embedding), jnp.stack(aux_losses).mean(), stats
